@@ -1,10 +1,10 @@
 import Phaser from "phaser";
 import Player from "./player";
-import { createNoise2D } from "simplex-noise";
-import alea from "alea";
+// import { createNoise2D } from "simplex-noise";
+// import alea from "alea";
 
-const prng = alea("seed");
-const noise2D = createNoise2D(prng);
+// const prng = alea("seed");
+// const noise2D = createNoise2D(prng);
 
 export default class MainScene extends Phaser.Scene {
   private player!: Player;
@@ -12,12 +12,17 @@ export default class MainScene extends Phaser.Scene {
   private scoreText!: Phaser.GameObjects.Text;
   private obstacles!: Phaser.Physics.Arcade.Group;
   private ground!: Phaser.Physics.Arcade.StaticGroup;
-  private lastX = 0;
+  // private lastX = 0;
   private scoreTimer!: Phaser.Time.TimerEvent;
   private spawnTimer?: Phaser.Time.TimerEvent;
-  private obstacleSpeed = -200; // Initial speed of obstacles
-  private maxSpeed = -600; // Maximum speed of obstacles
-  private speedIncrement = -10; // Amount to increase speed each time
+  private obstacleSpeed = -100; // Initial speed of obstacles
+  private maxSpeed = -500; // Maximum speed of obstacles
+  private speedIncrement = -20; // Amount to increase speed each time
+  private increaseSpeedTimer?: Phaser.Time.TimerEvent;
+  private maxDelay: number = 5000;
+  private minDelay: number = 3000;
+  private minimumPossibleDelay: number = 1000;
+  private delayDecrement: number = 100;
 
   constructor() {
     super("main-scene");
@@ -44,18 +49,23 @@ export default class MainScene extends Phaser.Scene {
       "assets/Adventurer_Flying.png",
       { frameWidth: 32, frameHeight: 32 }
     );
-    this.load.spritesheet("warrior", "assets/WarriorIdle.png", {
+    this.load.spritesheet("tree", "assets/tree.png", {
       frameWidth: 32,
       frameHeight: 32,
     });
-    this.load.spritesheet("ground", "assets/groundtile.png", {
-      frameWidth: 30,
-      frameHeight: 30,
+    this.load.spritesheet("ground", "assets/groundsolid.png", {
+      frameWidth: 32,
+      frameHeight: 32,
+    });
+    this.load.spritesheet("bat", "assets/BatIdleMoving.png", {
+      frameWidth: 32,
+      frameHeight: 32,
     });
   }
 
   create(): void {
     this.score = 0;
+    this.obstacleSpeed = -100;
     this.scoreText = this.add.text(16, 16, "Score: 0", {
       fontSize: "32px",
       color: "#fff",
@@ -85,6 +95,17 @@ export default class MainScene extends Phaser.Scene {
     this.scoreTimer = this.time.addEvent({
       delay: 1000,
       callback: () => this.updateScore(10),
+      callbackScope: this,
+      loop: true,
+    });
+
+    this.increaseSpeedTimer = this.time.addEvent({
+      delay: 5000, // Increase speed every 5 seconds
+      callback: () => {
+        if (this.obstacleSpeed > this.maxSpeed) {
+          this.obstacleSpeed += this.speedIncrement;
+        }
+      },
       callbackScope: this,
       loop: true,
     });
@@ -140,6 +161,15 @@ export default class MainScene extends Phaser.Scene {
         repeat: 0,
       });
     }
+
+    if (!this.anims.exists("fly")) {
+      this.anims.create({
+        key: "fly",
+        frames: this.anims.generateFrameNumbers("bat", { start: 0, end: 2 }),
+        frameRate: 10,
+        repeat: -1,
+      });
+    }
   }
 
   setupObstacles(): void {
@@ -159,29 +189,27 @@ export default class MainScene extends Phaser.Scene {
     );
 
     this.physics.add.collider(this.player.sprite, this.ground);
-
-    // Generate obstacles dynamically
-    this.time.addEvent({
-      delay: 2000, // every 2000 milliseconds
-      callback: this.spawnObstacle,
-      callbackScope: this,
-      loop: true,
-    });
   }
 
   spawnObstacle(): void {
     // Example of spawning an obstacle at the right edge of the screen and it moves left
     const x = (this.sys.game.config.width as number) + 50;
-    const y = (this.sys.game.config.height as number) - 50; // Adjust height as needed
-    const obstacle = this.obstacles.create(x, y, "warrior");
+    const isFlying = Phaser.Math.Between(0, 1);
+    const y = isFlying
+      ? (this.game.config.height as number) / 1.3
+      : (this.sys.game.config.height as number) - 48; // Adjust height as needed
+    const obstacleKey = isFlying ? "bat" : "tree";
+    const obstacle = this.obstacles.create(x, y, obstacleKey);
     obstacle.setVelocityX(this.obstacleSpeed); // Adjust speed as necessary
+
+    if (isFlying) {
+      obstacle.play("fly"); // Play flying animation for bats
+    }
 
     // Automatically remove the obstacle when it goes off screen
     obstacle.setInteractive().on("pointerdown", () => {
       obstacle.destroy();
     });
-    this.increaseObstacleSpeed(); // Increase speed for next spawn
-    this.scheduleNextObstacle(); // Schedule the next obstacle
   }
 
   increaseObstacleSpeed(): void {
@@ -191,13 +219,31 @@ export default class MainScene extends Phaser.Scene {
   }
 
   scheduleNextObstacle(): void {
-    const minDelay = 1000; // Minimum delay in milliseconds
-    const maxDelay = 3000; // Maximum delay in milliseconds
-    const delay = Phaser.Math.Between(minDelay, maxDelay); // Get a random delay
+    if (this.spawnTimer) {
+      this.spawnTimer.remove();
+      console.log("Existing timer removed");
+    }
+
+    // Decrement the min and max delay but ensure it doesn't drop below the minimum possible delay
+    this.minDelay = Math.max(
+      this.minimumPossibleDelay,
+      this.minDelay - this.delayDecrement
+    );
+    this.maxDelay = Math.max(
+      this.minDelay,
+      this.maxDelay - this.delayDecrement
+    ); // Ensure maxDelay is never less than minDelay
+
+    const delay = Phaser.Math.Between(this.minDelay, this.maxDelay);
+    console.log(`Next obstacle will spawn in ${delay / 1000} seconds.`);
 
     this.spawnTimer = this.time.delayedCall(
       delay,
-      this.spawnObstacle,
+      () => {
+        console.log("Spawning obstacle now.");
+        this.spawnObstacle();
+        this.scheduleNextObstacle(); // Schedule the next one
+      },
       [],
       this
     );
@@ -205,29 +251,29 @@ export default class MainScene extends Phaser.Scene {
 
   update(time: number, delta: number): void {
     this.player.update();
-    this.handleObstacles();
+    // this.handleObstacles();
   }
 
-  handleObstacles(): void {
-    this.lastX += 0.02; // Adjust for desired frequency
-    let noiseValue = noise2D(this.lastX, 0);
+  // handleObstacles(): void {
+  //   this.lastX += 0.02; // Adjust for desired frequency
+  //   let noiseValue = noise2D(this.lastX, 0);
 
-    if (noiseValue > 0.8 && this.obstacles.getChildren().length < 5) {
-      let obstacle = this.obstacles.create(
-        800,
-        (this.game.config.height as number) - 50,
-        "warrior"
-      );
-      obstacle.setVelocityX(-100);
-    }
+  //   if (noiseValue > 0.8 && this.obstacles.getChildren().length < 5) {
+  //     let obstacle = this.obstacles.create(
+  //       800,
+  //       (this.game.config.height as number) - 50,
+  //       "tree"
+  //     );
+  //     obstacle.setVelocityX(-100);
+  //   }
 
-    // Cleanup
-    this.obstacles.getChildren().forEach((obstacle) => {
-      if ((obstacle as Phaser.Physics.Arcade.Sprite).x < -50) {
-        obstacle.destroy();
-      }
-    });
-  }
+  //   // Cleanup
+  //   this.obstacles.getChildren().forEach((obstacle) => {
+  //     if ((obstacle as Phaser.Physics.Arcade.Sprite).x < -50) {
+  //       obstacle.destroy();
+  //     }
+  //   });
+  // }
 
   hitObstacle(
     player: Phaser.Physics.Arcade.Sprite,
