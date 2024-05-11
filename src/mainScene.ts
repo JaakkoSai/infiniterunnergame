@@ -15,9 +15,9 @@ export default class MainScene extends Phaser.Scene {
   // private lastX = 0;
   private scoreTimer!: Phaser.Time.TimerEvent;
   private spawnTimer?: Phaser.Time.TimerEvent;
-  private obstacleSpeed = -100; // Initial speed of obstacles
-  private maxSpeed = -500; // Maximum speed of obstacles
-  private speedIncrement = -20; // Amount to increase speed each time
+  private obstacleSpeed = -100;
+  private maxSpeed = -500;
+  private speedIncrement = -20;
   private increaseSpeedTimer?: Phaser.Time.TimerEvent;
   private maxDelay: number = 5000;
   private minDelay: number = 3000;
@@ -100,7 +100,7 @@ export default class MainScene extends Phaser.Scene {
     });
 
     this.increaseSpeedTimer = this.time.addEvent({
-      delay: 5000, // Increase speed every 5 seconds
+      delay: 5000,
       callback: () => {
         if (this.obstacleSpeed > this.maxSpeed) {
           this.obstacleSpeed += this.speedIncrement;
@@ -113,7 +113,6 @@ export default class MainScene extends Phaser.Scene {
     this.scheduleNextObstacle();
   }
   initializeAnimations(): void {
-    // Initialize animations for different states
     if (!this.anims.exists("idle")) {
       this.anims.create({
         key: "idle",
@@ -192,18 +191,17 @@ export default class MainScene extends Phaser.Scene {
   }
 
   spawnObstacle(): void {
-    // Example of spawning an obstacle at the right edge of the screen and it moves left
     const x = (this.sys.game.config.width as number) + 50;
     const isFlying = Phaser.Math.Between(0, 1);
     const y = isFlying
       ? (this.game.config.height as number) / 1.3
-      : (this.sys.game.config.height as number) - 48; // Adjust height as needed
+      : (this.sys.game.config.height as number) - 48;
     const obstacleKey = isFlying ? "bat" : "tree";
     const obstacle = this.obstacles.create(x, y, obstacleKey);
-    obstacle.setVelocityX(this.obstacleSpeed); // Adjust speed as necessary
+    obstacle.setVelocityX(this.obstacleSpeed);
 
     if (isFlying) {
-      obstacle.play("fly"); // Play flying animation for bats
+      obstacle.play("fly");
     }
 
     // Automatically remove the obstacle when it goes off screen
@@ -214,7 +212,7 @@ export default class MainScene extends Phaser.Scene {
 
   increaseObstacleSpeed(): void {
     if (this.obstacleSpeed > this.maxSpeed) {
-      this.obstacleSpeed += this.speedIncrement; // Decrease the speed value (more negative)
+      this.obstacleSpeed += this.speedIncrement;
     }
   }
 
@@ -224,7 +222,6 @@ export default class MainScene extends Phaser.Scene {
       console.log("Existing timer removed");
     }
 
-    // Decrement the min and max delay but ensure it doesn't drop below the minimum possible delay
     this.minDelay = Math.max(
       this.minimumPossibleDelay,
       this.minDelay - this.delayDecrement
@@ -232,7 +229,7 @@ export default class MainScene extends Phaser.Scene {
     this.maxDelay = Math.max(
       this.minDelay,
       this.maxDelay - this.delayDecrement
-    ); // Ensure maxDelay is never less than minDelay
+    );
 
     const delay = Phaser.Math.Between(this.minDelay, this.maxDelay);
     console.log(`Next obstacle will spawn in ${delay / 1000} seconds.`);
@@ -242,7 +239,7 @@ export default class MainScene extends Phaser.Scene {
       () => {
         console.log("Spawning obstacle now.");
         this.spawnObstacle();
-        this.scheduleNextObstacle(); // Schedule the next one
+        this.scheduleNextObstacle();
       },
       [],
       this

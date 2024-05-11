@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 
 export default class Player {
-  public sprite: Phaser.Physics.Arcade.Sprite; // Changed to public for accessible collision detection
+  public sprite: Phaser.Physics.Arcade.Sprite;
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
@@ -24,8 +24,7 @@ export default class Player {
     }
 
     if (this.cursors.up.isDown && this.sprite.body.blocked.down) {
-      // Ensure the player is on the ground
-      this.sprite.setVelocityY(-200); // Adjust this value for jump height
+      this.sprite.setVelocityY(-200);
       this.sprite.anims.play("jump", true);
     }
   }
